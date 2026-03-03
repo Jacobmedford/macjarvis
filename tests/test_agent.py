@@ -50,18 +50,20 @@ async def test_weather_tool() -> None:
     ):
         await session.start(Assistant())
 
-        # Run an agent turn following the user's request for weather information
-        result = await session.run(user_input="What's the weather in Tokyo?")
+        with mock_tools(
+            Assistant,
+            {"lookup_weather": lambda: "Tokyo: partly cloudy, 55°F, wind 8 mph."},
+        ):
+            result = await session.run(user_input="What's the weather in Tokyo?")
 
         # Test that the agent calls the weather tool with the correct arguments
         result.expect.next_event().is_function_call(
             name="lookup_weather", arguments={"location": "Tokyo"}
         )
 
-        # Test that the tool invocation works and returns the correct output
-        # To mock the tool output instead, see https://docs.livekit.io/agents/build/testing/#mock-tools
+        # Test that the mocked tool output is returned
         result.expect.next_event().is_function_call_output(
-            output="sunny with a temperature of 70 degrees."
+            output="Tokyo: partly cloudy, 55°F, wind 8 mph."
         )
 
         # Evaluate the agent's response for accurate weather information
@@ -71,7 +73,7 @@ async def test_weather_tool() -> None:
             .judge(
                 llm,
                 intent="""
-                Informs the user that the weather is sunny with a temperature of 70 degrees.
+                Informs the user about Tokyo's weather: partly cloudy, 55 degrees Fahrenheit, wind 8 mph.
 
                 Optional context that may or may not be included (but the response must not contradict these facts)
                 - The location for the weather report is Tokyo

@@ -1,5 +1,6 @@
 import logging
 
+import httpx
 from dotenv import load_dotenv
 from livekit.agents import (
     NOT_GIVEN,
@@ -20,6 +21,34 @@ from livekit.plugins import cartesia, deepgram, noise_cancellation, openai, sile
 from livekit.plugins.turn_detector.multilingual import MultilingualModel
 
 logger = logging.getLogger("agent")
+
+# WMO weather interpretation codes → plain-English description
+_WMO_CODES: dict[int, str] = {
+    0: "clear sky",
+    1: "mainly clear",
+    2: "partly cloudy",
+    3: "overcast",
+    45: "foggy",
+    48: "icy fog",
+    51: "light drizzle",
+    53: "moderate drizzle",
+    55: "heavy drizzle",
+    61: "light rain",
+    63: "moderate rain",
+    65: "heavy rain",
+    71: "light snow",
+    73: "moderate snow",
+    75: "heavy snow",
+    77: "snow grains",
+    80: "light showers",
+    81: "moderate showers",
+    82: "heavy showers",
+    85: "light snow showers",
+    86: "heavy snow showers",
+    95: "thunderstorm",
+    96: "thunderstorm with light hail",
+    99: "thunderstorm with heavy hail",
+}
 
 load_dotenv(".env.local")
 
@@ -44,10 +73,42 @@ class Assistant(Agent):
         Args:
             location: The location to look up weather information for (e.g. city name)
         """
-
         logger.info(f"Looking up weather for {location}")
 
-        return "sunny with a temperature of 70 degrees."
+        async with httpx.AsyncClient() as client:
+            # Geocode the city name to lat/lon
+            geo = await client.get(
+                "https://geocoding-api.open-meteo.com/v1/search",
+                params={"name": location, "count": 1},
+            )
+            geo.raise_for_status()
+            results = geo.json().get("results")
+            if not results:
+                return f"Weather data is not available for {location}."
+
+            place = results[0]
+            lat, lon = place["latitude"], place["longitude"]
+            name = place.get("name", location)
+
+            # Fetch current weather
+            weather = await client.get(
+                "https://api.open-meteo.com/v1/forecast",
+                params={
+                    "latitude": lat,
+                    "longitude": lon,
+                    "current": "temperature_2m,weather_code,wind_speed_10m",
+                    "temperature_unit": "fahrenheit",
+                    "wind_speed_unit": "mph",
+                },
+            )
+            weather.raise_for_status()
+            current = weather.json()["current"]
+
+        temp = round(current["temperature_2m"])
+        wind = round(current["wind_speed_10m"])
+        condition = _WMO_CODES.get(current["weather_code"], "unknown conditions")
+
+        return f"{name}: {condition}, {temp}°F, wind {wind} mph."
 
 
 def prewarm(proc: JobProcess):
