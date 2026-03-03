@@ -1,4 +1,6 @@
 import logging
+import sys
+import os
 
 import httpx
 from dotenv import load_dotenv
@@ -52,14 +54,47 @@ _WMO_CODES: dict[int, str] = {
 
 load_dotenv(".env.local")
 
+# Ensure src/ is importable when running directly
+_src_dir = os.path.dirname(os.path.abspath(__file__))
+if _src_dir not in sys.path:
+    sys.path.insert(0, _src_dir)
+
+# Collect optional integration tools
+_extra_tools: list = []
+
+try:
+    from integrations.gmail.voice_tools import check_emails, reply_to_email
+    _extra_tools.extend([check_emails, reply_to_email])
+    logger.info("Gmail voice tools loaded.")
+except ImportError:
+    pass
+
+try:
+    from integrations.slack.voice_tools import post_to_slack
+    _extra_tools.append(post_to_slack)
+    logger.info("Slack voice tools loaded.")
+except ImportError:
+    pass
+
+try:
+    from integrations.discord.voice_tools import add_task, complete_task, list_tasks
+    _extra_tools.extend([add_task, complete_task, list_tasks])
+    logger.info("Discord voice tools loaded.")
+except ImportError:
+    pass
+
 
 class Assistant(Agent):
     def __init__(self) -> None:
         super().__init__(
-            instructions="""You are a helpful voice AI assistant.
-            You eagerly assist users with their questions by providing information from your extensive knowledge.
-            Your responses are concise, to the point, and without any complex formatting or punctuation including emojis, asterisks, or other symbols.
-            You are curious, friendly, and have a sense of humor.""",
+            instructions="""You are Jarvis — Just A Rather Very Intelligent System — a sophisticated personal AI assistant.
+            You are professional, efficient, and concise. You speak in a calm, confident tone without being verbose.
+            Your responses contain no complex formatting, emojis, asterisks, or other symbols — plain speech only.
+            You are aware of and can use all available integrations: Gmail (check emails, send replies),
+            Slack (post messages to channels), task management (add, complete, and list tasks),
+            and real-time weather lookups. When a user asks about their inbox, messages, or tasks,
+            proactively use the appropriate tool rather than asking for clarification.""",
+            tools=_extra_tools,
         )
 
     # all functions annotated with @function_tool will be passed to the LLM when this
@@ -188,6 +223,11 @@ async def entrypoint(ctx: JobContext):
             # - For telephony applications, use `BVCTelephony` for best results
             noise_cancellation=noise_cancellation.BVC(),
         ),
+    )
+
+    # Greet the user as Jarvis on session start
+    session.generate_reply(
+        instructions="Greet the user as Jarvis, briefly introduce your capabilities"
     )
 
     # Join the room and connect to the user
