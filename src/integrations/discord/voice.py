@@ -169,10 +169,12 @@ class VoiceSession:
 
     async def _conversation_loop(self) -> None:
         """Record in chunks, detect speech, transcribe, respond."""
-        await self.text_channel.send("[debug] Conversation loop started.")
-        loop = asyncio.get_event_loop()
+        await self.text_channel.send(
+            f"[debug] Loop starting. connected={self.vc.is_connected()}, active={self._active}"
+        )
 
         while self._active and self.vc.is_connected():
+            await self.text_channel.send("[debug] Loop iteration.")
             try:
                 # Skip recording while Jarvis is speaking
                 if self._responding or self.vc.is_playing():
@@ -183,10 +185,11 @@ class VoiceSession:
                 sink = discord.sinks.WaveSink()
                 done = asyncio.Event()
 
-                def _after(s, *_):
-                    # Called from discord's audio thread — must use threadsafe call
-                    loop.call_soon_threadsafe(done.set)
+                # Callback must be a coroutine in discord.py 2.x
+                async def _after(s, *_):
+                    done.set()
 
+                await self.text_channel.send("[debug] Calling start_recording...")
                 self.vc.start_recording(sink, _after)
                 await self.text_channel.send("[debug] Recording started...")
                 await asyncio.sleep(CHUNK_SECONDS)
@@ -226,9 +229,16 @@ class VoiceSession:
                     self._bg_tasks.add(task)
                     task.add_done_callback(self._bg_tasks.discard)
 
+            except asyncio.CancelledError:
+                raise
             except Exception as exc:
                 logger.exception("Error in conversation loop: %s", exc)
                 await self.text_channel.send(f"[debug] Loop error: {exc}")
+                await asyncio.sleep(1)
+
+        await self.text_channel.send(
+            f"[debug] Loop exited. connected={self.vc.is_connected()}, active={self._active}"
+        )
 
     async def _handle_speech(self, wav_bytes: bytes) -> None:
         """Transcribe audio, get response, play TTS."""
