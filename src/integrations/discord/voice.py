@@ -169,53 +169,66 @@ class VoiceSession:
 
     async def _conversation_loop(self) -> None:
         """Record in chunks, detect speech, transcribe, respond."""
+        await self.text_channel.send("[debug] Conversation loop started.")
+        loop = asyncio.get_event_loop()
+
         while self._active and self.vc.is_connected():
-            # Skip recording while Jarvis is speaking
-            if self._responding or self.vc.is_playing():
-                await asyncio.sleep(0.5)
-                continue
-
-            # Record a chunk
-            sink = discord.sinks.WaveSink()
-            done = asyncio.Event()
-
-            def _after(s, *_):
-                done.set()
-
-            self.vc.start_recording(sink, _after)
-            await asyncio.sleep(CHUNK_SECONDS)
-            self.vc.stop_recording()
-            # Wait for recording to fully flush (up to 2s)
             try:
-                await asyncio.wait_for(done.wait(), timeout=2.0)
-            except asyncio.TimeoutError:
-                pass
-
-            # Find user with the most speech energy
-            best_user = None
-            best_rms = 0.0
-
-            for user_id, audio_data in sink.audio_data.items():
-                member = self.vc.guild.get_member(user_id)
-                if not member or member.bot:
+                # Skip recording while Jarvis is speaking
+                if self._responding or self.vc.is_playing():
+                    await asyncio.sleep(0.5)
                     continue
-                # Seek to beginning — BytesIO position may be at end after writing
-                audio_data.file.seek(0)
-                wav_bytes = audio_data.file.read()
-                if len(wav_bytes) < MIN_SPEECH_BYTES:
-                    await self.text_channel.send(f"[debug] audio too short: {len(wav_bytes)} bytes")
-                    continue
-                energy = _rms(wav_bytes)
-                await self.text_channel.send(f"[debug] energy={energy:.0f} threshold={SPEECH_THRESHOLD}")
-                if energy > SPEECH_THRESHOLD and energy > best_rms:
-                    best_rms = energy
-                    best_user = (user_id, wav_bytes)
 
-            if best_user:
-                _, wav_bytes = best_user
-                task = asyncio.create_task(self._handle_speech(wav_bytes))
-                self._bg_tasks.add(task)
-                task.add_done_callback(self._bg_tasks.discard)
+                # Record a chunk
+                sink = discord.sinks.WaveSink()
+                done = asyncio.Event()
+
+                def _after(s, *_):
+                    # Called from discord's audio thread — must use threadsafe call
+                    loop.call_soon_threadsafe(done.set)
+
+                self.vc.start_recording(sink, _after)
+                await self.text_channel.send("[debug] Recording started...")
+                await asyncio.sleep(CHUNK_SECONDS)
+                self.vc.stop_recording()
+
+                # Wait for recording to fully flush (up to 3s)
+                try:
+                    await asyncio.wait_for(done.wait(), timeout=3.0)
+                except asyncio.TimeoutError:
+                    await self.text_channel.send("[debug] Warning: recording done event timed out")
+
+                users_found = list(sink.audio_data.keys())
+                await self.text_channel.send(f"[debug] Chunk done. Users with audio: {users_found}")
+
+                # Find user with the most speech energy
+                best_user = None
+                best_rms = 0.0
+
+                for user_id, audio_data in sink.audio_data.items():
+                    member = self.vc.guild.get_member(user_id)
+                    if not member or member.bot:
+                        continue
+                    # Seek to beginning — BytesIO position may be at end after writing
+                    audio_data.file.seek(0)
+                    wav_bytes = audio_data.file.read()
+                    energy = _rms(wav_bytes)
+                    await self.text_channel.send(
+                        f"[debug] {member.name}: {len(wav_bytes)} bytes, energy={energy:.0f}"
+                    )
+                    if energy > SPEECH_THRESHOLD and energy > best_rms:
+                        best_rms = energy
+                        best_user = (user_id, wav_bytes)
+
+                if best_user:
+                    _, wav_bytes = best_user
+                    task = asyncio.create_task(self._handle_speech(wav_bytes))
+                    self._bg_tasks.add(task)
+                    task.add_done_callback(self._bg_tasks.discard)
+
+            except Exception as exc:
+                logger.exception("Error in conversation loop: %s", exc)
+                await self.text_channel.send(f"[debug] Loop error: {exc}")
 
     async def _handle_speech(self, wav_bytes: bytes) -> None:
         """Transcribe audio, get response, play TTS."""
