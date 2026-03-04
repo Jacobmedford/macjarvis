@@ -40,18 +40,31 @@ class _AudioBuffer(voice_recv.AudioSink):
     def __init__(self):
         super().__init__()
         self.buffers: dict[int, bytearray] = {}
+        self._decoders: dict[int, discord.opus.Decoder] = {}
 
     def wants_opus(self) -> bool:
-        return False  # We want decoded PCM
+        # Receive raw Opus and decode ourselves so we can swallow
+        # corrupted-frame errors instead of crashing the router thread.
+        return True
 
     def write(self, user, data: voice_recv.VoiceData):
         uid = user.id if user else 0
+        opus_bytes = data.opus
+        if not opus_bytes:
+            return
+        try:
+            if uid not in self._decoders:
+                self._decoders[uid] = discord.opus.Decoder()
+            pcm = self._decoders[uid].decode(opus_bytes, fec=False)
+        except Exception:
+            return  # skip corrupt frames silently
         if uid not in self.buffers:
             self.buffers[uid] = bytearray()
-        self.buffers[uid].extend(data.pcm)
+        self.buffers[uid].extend(pcm)
 
     def cleanup(self):
         self.buffers.clear()
+        self._decoders.clear()
 
 
 async def _transcribe(pcm_bytes: bytes) -> str:
