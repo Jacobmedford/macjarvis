@@ -1,26 +1,18 @@
 """Jarvis Discord voice session.
 
-Listens in a Discord voice channel, transcribes speech via Deepgram,
-generates responses via GPT-4o-mini (with Jarvis persona + context),
-and plays back TTS audio via OpenAI.
-
-Architecture:
-  - Records audio in 3-second chunks using discord.py WaveSink
-  - Simple RMS energy threshold for speech detection
-  - Deepgram REST API for STT
-  - GPT-4o-mini for response (same model as LiveKit voice agent)
-  - OpenAI TTS (tts-1, onyx voice) for playback
+Uses discord-ext-voice-recv for audio receiving (discord.py removed this).
+Transcribes with Deepgram, responds with GPT-4o-mini, plays back via OpenAI TTS.
 """
 
 import asyncio
-import io
 import logging
 import struct
 import tempfile
 
 import discord
-import httpx
+from discord.ext import voice_recv
 from openai import AsyncOpenAI
+import httpx
 from sqlalchemy import select
 
 from core.config import settings
@@ -28,29 +20,51 @@ from core.database import AsyncSessionLocal, EmailSummary, Task
 
 logger = logging.getLogger("discord_voice")
 
-# Speech detection threshold (RMS energy of 16-bit PCM samples)
-SPEECH_THRESHOLD = 50
-# Seconds of audio to collect per chunk
-CHUNK_SECONDS = 3
-# Minimum bytes of speech content to bother transcribing (~0.3s at 48kHz stereo 16-bit)
-MIN_SPEECH_BYTES = 48000 * 2 * 2 // 4
+SPEECH_THRESHOLD = 50       # RMS energy threshold
+CHUNK_SECONDS = 3           # Seconds per recording chunk
+MIN_SPEECH_BYTES = 48000 * 2 * 2 // 4  # ~0.3s of audio
 
 
-def _rms(wav_bytes: bytes) -> float:
-    """Calculate RMS energy of raw PCM bytes (16-bit little-endian)."""
-    if len(wav_bytes) < 2:
+def _rms(pcm_bytes: bytes) -> float:
+    """RMS energy of raw 16-bit little-endian PCM."""
+    if len(pcm_bytes) < 2:
         return 0.0
-    # Skip WAV header (44 bytes) if present
-    data = wav_bytes[44:] if wav_bytes[:4] == b"RIFF" else wav_bytes
-    if len(data) < 2:
-        return 0.0
-    n = len(data) // 2
-    samples = struct.unpack(f"<{n}h", data[: n * 2])
+    n = len(pcm_bytes) // 2
+    samples = struct.unpack(f"<{n}h", pcm_bytes[: n * 2])
     return (sum(s * s for s in samples) / n) ** 0.5
 
 
-async def _transcribe(wav_bytes: bytes) -> str:
-    """Send WAV audio to Deepgram and return the transcript."""
+class _AudioBuffer(voice_recv.AudioSink):
+    """Collects raw PCM per user into a buffer."""
+
+    def __init__(self):
+        super().__init__()
+        self.buffers: dict[int, bytearray] = {}
+
+    def wants_opus(self) -> bool:
+        return False  # We want decoded PCM
+
+    def write(self, user, data: voice_recv.VoiceData):
+        uid = user.id if user else 0
+        if uid not in self.buffers:
+            self.buffers[uid] = bytearray()
+        self.buffers[uid].extend(data.pcm)
+
+    def cleanup(self):
+        self.buffers.clear()
+
+
+async def _transcribe(pcm_bytes: bytes) -> str:
+    """Send raw PCM to Deepgram as WAV and return transcript."""
+    import io, wave
+    buf = io.BytesIO()
+    with wave.open(buf, "wb") as wf:
+        wf.setnchannels(2)
+        wf.setsampwidth(2)
+        wf.setframerate(48000)
+        wf.writeframes(pcm_bytes)
+    wav_bytes = buf.getvalue()
+
     async with httpx.AsyncClient(timeout=30) as client:
         resp = await client.post(
             "https://api.deepgram.com/v1/listen",
@@ -67,16 +81,12 @@ async def _transcribe(wav_bytes: bytes) -> str:
 
 
 async def _build_context() -> str:
-    """Gather calendar, email, and task context for Jarvis."""
     parts: list[str] = []
-
     try:
         from integrations.calendar.client import get_today_events
-
         events = await get_today_events()
         if events:
-            titles = [ev["title"] for ev in events]
-            parts.append("Today's meetings: " + ", ".join(titles))
+            parts.append("Today's meetings: " + ", ".join(e["title"] for e in events))
     except Exception:
         pass
 
@@ -86,10 +96,7 @@ async def _build_context() -> str:
         )
         emails = result.scalars().all()
         if emails:
-            parts.append(
-                "Recent emails: "
-                + "; ".join(f"{e.sender}: {e.subject}" for e in emails)
-            )
+            parts.append("Recent emails: " + "; ".join(f"{e.sender}: {e.subject}" for e in emails))
 
     async with AsyncSessionLocal() as session:
         result = await session.execute(
@@ -99,22 +106,19 @@ async def _build_context() -> str:
         if pending:
             parts.append("Pending tasks: " + "; ".join(t.title for t in pending))
 
-    return "\n".join(parts) if parts else ""
+    return "\n".join(parts)
 
 
 async def _get_response(transcript: str) -> str:
-    """Generate Jarvis reply via GPT-4o-mini."""
     context = await _build_context()
     client = AsyncOpenAI(api_key=settings.openai_api_key)
-
     system = (
         "You are Jarvis — a sophisticated personal AI assistant in a Discord voice channel. "
-        "Be concise: 1-2 sentences max. Plain speech only — no lists, no markdown, no emojis."
+        "Be concise: 1-2 sentences. Plain speech only — no lists, no markdown, no emojis."
     )
     if context:
         system += f"\n\nContext:\n{context}"
-
-    response = await client.chat.completions.create(
+    resp = await client.chat.completions.create(
         model="gpt-4o-mini",
         max_tokens=150,
         messages=[
@@ -122,22 +126,17 @@ async def _get_response(transcript: str) -> str:
             {"role": "user", "content": transcript},
         ],
     )
-    return response.choices[0].message.content.strip()
+    return resp.choices[0].message.content.strip()
 
 
 async def _synthesize(text: str) -> bytes:
-    """Convert text to MP3 audio using OpenAI TTS."""
     client = AsyncOpenAI(api_key=settings.openai_api_key)
-    response = await client.audio.speech.create(
-        model="tts-1",
-        voice="onyx",
-        input=text,
-    )
-    return response.content
+    resp = await client.audio.speech.create(model="tts-1", voice="onyx", input=text)
+    return resp.content
 
 
 class VoiceSession:
-    """Manages Jarvis listening and speaking in one Discord voice channel."""
+    """Manages Jarvis in a Discord voice channel."""
 
     def __init__(self, vc: discord.VoiceClient, text_channel: discord.abc.Messageable):
         self.vc = vc
@@ -155,7 +154,6 @@ class VoiceSession:
         await self.text_channel.send(
             "Jarvis is listening. Speak naturally — I process audio every few seconds."
         )
-        logger.info("Voice session started in #%s", self.vc.channel.name)
 
     async def stop(self) -> None:
         self._active = False
@@ -165,86 +163,49 @@ class VoiceSession:
             self.vc.stop()
         if self.vc.is_connected():
             await self.vc.disconnect()
-        logger.info("Voice session stopped.")
 
     async def _conversation_loop(self) -> None:
-        """Record in chunks, detect speech, transcribe, respond."""
-        await self.text_channel.send(
-            f"[debug] Loop starting. connected={self.vc.is_connected()}, active={self._active}"
-        )
-
         while self._active and self.vc.is_connected():
-            await self.text_channel.send("[debug] Loop iteration.")
             try:
-                # Skip recording while Jarvis is speaking
                 if self._responding or self.vc.is_playing():
                     await asyncio.sleep(0.5)
                     continue
 
-                # Record a chunk
-                sink = discord.sinks.WaveSink()
-                done = asyncio.Event()
-
-                # Callback must be a coroutine in discord.py 2.x
-                async def _after(s, *_):
-                    done.set()
-
-                await self.text_channel.send("[debug] Calling start_recording...")
-                self.vc.start_recording(sink, _after)
-                await self.text_channel.send("[debug] Recording started...")
+                # Attach audio sink and collect a chunk
+                sink = _AudioBuffer()
+                self.vc.listen(sink)
                 await asyncio.sleep(CHUNK_SECONDS)
-                self.vc.stop_recording()
+                self.vc.stop_listening()
 
-                # Wait for recording to fully flush (up to 3s)
-                try:
-                    await asyncio.wait_for(done.wait(), timeout=3.0)
-                except asyncio.TimeoutError:
-                    await self.text_channel.send("[debug] Warning: recording done event timed out")
-
-                users_found = list(sink.audio_data.keys())
-                await self.text_channel.send(f"[debug] Chunk done. Users with audio: {users_found}")
-
-                # Find user with the most speech energy
-                best_user = None
+                # Find loudest speaker
+                best_user_id = None
                 best_rms = 0.0
 
-                for user_id, audio_data in sink.audio_data.items():
-                    member = self.vc.guild.get_member(user_id)
-                    if not member or member.bot:
+                for uid, pcm in sink.buffers.items():
+                    if len(pcm) < MIN_SPEECH_BYTES:
                         continue
-                    # Seek to beginning — BytesIO position may be at end after writing
-                    audio_data.file.seek(0)
-                    wav_bytes = audio_data.file.read()
-                    energy = _rms(wav_bytes)
-                    await self.text_channel.send(
-                        f"[debug] {member.name}: {len(wav_bytes)} bytes, energy={energy:.0f}"
-                    )
+                    energy = _rms(bytes(pcm))
                     if energy > SPEECH_THRESHOLD and energy > best_rms:
                         best_rms = energy
-                        best_user = (user_id, wav_bytes)
+                        best_user_id = uid
+                        best_pcm = bytes(pcm)
 
-                if best_user:
-                    _, wav_bytes = best_user
-                    task = asyncio.create_task(self._handle_speech(wav_bytes))
+                if best_user_id:
+                    task = asyncio.create_task(self._handle_speech(best_pcm))
                     self._bg_tasks.add(task)
                     task.add_done_callback(self._bg_tasks.discard)
 
             except asyncio.CancelledError:
                 raise
             except Exception as exc:
-                logger.exception("Error in conversation loop: %s", exc)
-                await self.text_channel.send(f"[debug] Loop error: {exc}")
+                logger.exception("Voice loop error: %s", exc)
+                await self.text_channel.send(f"[error] {exc}")
                 await asyncio.sleep(1)
 
-        await self.text_channel.send(
-            f"[debug] Loop exited. connected={self.vc.is_connected()}, active={self._active}"
-        )
-
-    async def _handle_speech(self, wav_bytes: bytes) -> None:
-        """Transcribe audio, get response, play TTS."""
+    async def _handle_speech(self, pcm_bytes: bytes) -> None:
         self._responding = True
         try:
-            transcript = await _transcribe(wav_bytes)
+            transcript = await _transcribe(pcm_bytes)
             if not transcript.strip():
                 return
 
@@ -256,20 +217,16 @@ class VoiceSession:
             await self.text_channel.send(f"**Jarvis:** {reply}")
 
             mp3_bytes = await _synthesize(reply)
-
-            # Write to temp file — FFmpegPCMAudio needs a seekable source
             with tempfile.NamedTemporaryFile(suffix=".mp3", delete=False) as f:
                 f.write(mp3_bytes)
                 tmp_path = f.name
 
-            source = discord.FFmpegPCMAudio(tmp_path)
-            self.vc.play(source)
-
+            self.vc.play(discord.FFmpegPCMAudio(tmp_path))
             while self.vc.is_playing():
                 await asyncio.sleep(0.1)
 
         except Exception as exc:
-            logger.error("Voice handling error: %s", exc)
+            logger.error("Speech handling error: %s", exc)
             await self.text_channel.send(f"Sorry, I hit an error: {exc}")
         finally:
             self._responding = False

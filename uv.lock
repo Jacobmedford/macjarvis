@@ -15,6 +15,7 @@ source = { editable = "." }
 dependencies = [
     { name = "aiosqlite" },
     { name = "anthropic" },
+    { name = "discord-ext-voice-recv" },
     { name = "discord-py", extra = ["voice"] },
     { name = "fastapi", version = "0.128.8", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.10'" },
     { name = "fastapi", version = "0.135.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.10'" },
@@ -55,6 +56,7 @@ dev = [
 requires-dist = [
     { name = "aiosqlite", specifier = ">=0.21" },
     { name = "anthropic", specifier = ">=0.49" },
+    { name = "discord-ext-voice-recv", specifier = ">=0.5.2a179" },
     { name = "discord-py", extras = ["voice"], specifier = ">=2.4" },
     { name = "fastapi", specifier = ">=0.115" },
     { name = "google-api-python-client", specifier = ">=2.165" },
@@ -964,6 +966,18 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/3a/c7/be28ab949a5b5ba27f6643809fd80c05c951433b6d5902df715808d1dcb0/davey-0.1.4-pp39-pypy39_pp73-musllinux_1_2_armv7l.whl", hash = "sha256:98e3bfabe6fd0a2ce43f5528098b9163ffe83d7cbe567f6cd613ad99447e8364", size = 1027044, upload-time = "2026-03-02T17:19:27.565Z" },
     { url = "https://files.pythonhosted.org/packages/37/bf/a30b2acc4fe7fb6863c5f35f77f3c31b1804450761fc8076a121d7c96125/davey-0.1.4-pp39-pypy39_pp73-musllinux_1_2_i686.whl", hash = "sha256:42f70f5442ac62dacf53892552c31892d0cb9c4ce51173ec1019a993c92991a5", size = 1055886, upload-time = "2026-03-02T17:19:47.536Z" },
     { url = "https://files.pythonhosted.org/packages/56/33/5aa55944abef4ce2767e3c884e65e8f3c24e4dc11d90e884d049e8876787/davey-0.1.4-pp39-pypy39_pp73-musllinux_1_2_x86_64.whl", hash = "sha256:da6d60582a52632ceac7716960d0d1fb1a017a98eefe218041d10290070e3907", size = 1048282, upload-time = "2026-03-02T17:20:07.731Z" },
+]
+
+[[package]]
+name = "discord-ext-voice-recv"
+version = "0.5.2a179"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "discord-py", extra = ["voice"] },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/da/4e/f52f69b4854b817b50d5998f1f470e42f966af9ac47cd853736f6c501a3f/discord_ext_voice_recv-0.5.2a179.tar.gz", hash = "sha256:6cb8f5ff60c3885020e5ebd879323dc97ebb0745788f3778a14ef31810f848a8", size = 39805, upload-time = "2025-06-18T04:56:39.876Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/bc/65/d3a9d555cb2baaab6f8081d64d4d423688ba28ff7ae6608c374d06add3f6/discord_ext_voice_recv-0.5.2a179-py3-none-any.whl", hash = "sha256:f3fa65f2c1591bef2382aa39f3ebc25d6751b405aef5b5d113dfb452640f29fc", size = 41041, upload-time = "2025-06-18T04:56:38.785Z" },
 ]
 
 [[package]]
