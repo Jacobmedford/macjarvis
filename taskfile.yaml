@@ -20,3 +20,38 @@ tasks:
     interactive: true
     cmds:
       - "uv run src/agent.py dev"
+
+  dashboard:
+    desc: "Run the automation dashboard on port 8080"
+    cmds:
+      - "uv run uvicorn src.dashboard.app:app --host 0.0.0.0 --port 8080 --reload"
+
+  email-worker:
+    desc: "Run the email summariser background worker"
+    cmds:
+      - "uv run python -m workers.email_summariser"
+
+  slack:
+    desc: "Run the Slack Socket Mode bot"
+    cmds:
+      - "uv run python -m integrations.slack.bot"
+
+  discord:
+    desc: "Run the Discord task bot"
+    cmds:
+      - "uv run python -m integrations.discord.bot"
+
+  gmail-setup:
+    desc: "One-time Gmail OAuth setup — opens browser for consent"
+    cmds:
+      - "uv run python -m integrations.gmail.client"
+
+  calendar-setup:
+    desc: "One-time Google Calendar OAuth setup (combined Gmail + Calendar scopes)"
+    cmds:
+      - "uv run python -m integrations.calendar.client"
+
+  presence:
+    desc: "Run the presence monitor (auto-mutes Jarvis during calendar meetings)"
+    cmds:
+      - "uv run python -m workers.presence_monitor"

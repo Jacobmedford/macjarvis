@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h1>Dashboard</h1>
+  <p class="subtitle">Your personal automation command center</p>
+</div>
+
+<div class="stats-grid" id="stats-grid">
+  <div class="stat-card">
+    <div class="stat-value" id="stat-tasks">—</div>
+    <div class="stat-label">Tasks</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-value" id="stat-emails">—</div>
+    <div class="stat-label">Email Summaries</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-value" id="stat-events">—</div>
+    <div class="stat-label">Agent Events</div>
+  </div>
+</div>
+
+<div class="section">
+  <h2>Recent Events</h2>
+  <div id="events-list" class="events-list">
+    <p class="empty-state">Loading events…</p>
+  </div>
+</div>
+
+<script>
+async function loadEvents() {
+  const res = await fetch('/api/events');
+  const events = await res.json();
+  const el = document.getElementById('events-list');
+  if (events.length === 0) {
+    el.innerHTML = '<p class="empty-state">No events yet. Start the voice agent or workers.</p>';
+    return;
+  }
+  el.innerHTML = events.map(e => `
+    <div class="event-item">
+      <span class="event-type">${e.event_type}</span>
+      <span class="event-time">${new Date(e.created_at).toLocaleString()}</span>
+      <span class="event-payload">${e.payload}</span>
+    </div>
+  `).join('');
+}
+
+loadEvents();
+setInterval(loadEvents, 10000);
+</script>
+{% endblock %}

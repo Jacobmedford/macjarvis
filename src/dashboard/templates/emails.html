@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+
+{% block title %}Email Summaries{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h1>Email Summaries</h1>
+  <p class="subtitle">Powered by the email summariser worker</p>
+</div>
+
+<div class="email-list">
+  {% if emails %}
+    {% for email in emails %}
+    <div class="email-card">
+      <div class="email-header">
+        <span class="email-sender">{{ email.sender }}</span>
+        <span class="email-date">{{ email.created_at.strftime('%b %d, %H:%M') if email.created_at else '' }}</span>
+      </div>
+      <div class="email-subject">{{ email.subject }}</div>
+      <div class="email-summary">{{ email.summary }}</div>
+    </div>
+    {% endfor %}
+  {% else %}
+    <p class="empty-state">No email summaries yet. Start the email summariser worker and configure Gmail OAuth.</p>
+  {% endif %}
+</div>
+{% endblock %}

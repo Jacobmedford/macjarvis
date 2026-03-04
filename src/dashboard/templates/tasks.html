@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+
+{% block title %}Tasks{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h1>Tasks</h1>
+</div>
+
+<form class="add-form" method="post" action="/tasks">
+  <input type="text" name="title" placeholder="New task…" required>
+  <button type="submit">Add Task</button>
+</form>
+
+<div class="task-list">
+  {% if tasks %}
+    {% for task in tasks %}
+    <div class="task-item {% if task.status == 'done' %}task-done{% endif %}">
+      <span class="task-status">{% if task.status == 'done' %}✅{% else %}⬜{% endif %}</span>
+      <span class="task-title">{{ task.title }}</span>
+      <span class="task-source badge">{{ task.source }}</span>
+      {% if task.status != 'done' %}
+      <form method="post" action="/tasks/{{ task.id }}/done" style="display:inline">
+        <button type="submit" class="btn-small">Done</button>
+      </form>
+      {% endif %}
+    </div>
+    {% endfor %}
+  {% else %}
+    <p class="empty-state">No tasks yet. Add one above or say "add task" to the voice agent.</p>
+  {% endif %}
+</div>
+{% endblock %}

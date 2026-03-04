@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}Automation Dashboard{% endblock %}</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <nav>
+    <div class="nav-brand">Automation Hub</div>
+    <ul class="nav-links">
+      <li><a href="/">Dashboard</a></li>
+      <li><a href="/tasks">Tasks</a></li>
+      <li><a href="/emails">Emails</a></li>
+    </ul>
+    <div class="integration-dots" id="integration-dots">
+      <span class="dot dot-unknown" title="Gmail" data-key="gmail">Gmail</span>
+      <span class="dot dot-unknown" title="Slack" data-key="slack">Slack</span>
+      <span class="dot dot-unknown" title="Discord" data-key="discord">Discord</span>
+      <span class="dot dot-unknown" title="Anthropic" data-key="anthropic">AI</span>
+    </div>
+  </nav>
+
+  <main>
+    {% block content %}{% endblock %}
+  </main>
+
+  <script src="/static/dashboard.js"></script>
+</body>
+</html>
