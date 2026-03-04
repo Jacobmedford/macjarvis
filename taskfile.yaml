@@ -55,3 +55,12 @@ tasks:
     desc: "Run the presence monitor (auto-mutes Jarvis during calendar meetings)"
     cmds:
       - "uv run python -m workers.presence_monitor"
+
+  start:
+    desc: "Start all Jarvis services in parallel (dashboard, discord, email, presence, slack)"
+    deps:
+      - dashboard
+      - discord
+      - email-worker
+      - presence
+      - slack
