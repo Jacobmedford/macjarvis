@@ -29,11 +29,11 @@ from core.database import AsyncSessionLocal, EmailSummary, Task
 logger = logging.getLogger("discord_voice")
 
 # Speech detection threshold (RMS energy of 16-bit PCM samples)
-SPEECH_THRESHOLD = 400
+SPEECH_THRESHOLD = 50
 # Seconds of audio to collect per chunk
 CHUNK_SECONDS = 3
-# Minimum bytes of speech content to bother transcribing (~0.5s at 48kHz stereo 16-bit)
-MIN_SPEECH_BYTES = 48000 * 2 * 2 // 2
+# Minimum bytes of speech content to bother transcribing (~0.3s at 48kHz stereo 16-bit)
+MIN_SPEECH_BYTES = 48000 * 2 * 2 // 4
 
 
 def _rms(wav_bytes: bytes) -> float:
@@ -185,7 +185,11 @@ class VoiceSession:
             self.vc.start_recording(sink, _after)
             await asyncio.sleep(CHUNK_SECONDS)
             self.vc.stop_recording()
-            await asyncio.sleep(0.2)  # Let stop_recording flush
+            # Wait for recording to fully flush (up to 2s)
+            try:
+                await asyncio.wait_for(done.wait(), timeout=2.0)
+            except asyncio.TimeoutError:
+                pass
 
             # Find user with the most speech energy
             best_user = None
@@ -195,10 +199,14 @@ class VoiceSession:
                 member = self.vc.guild.get_member(user_id)
                 if not member or member.bot:
                     continue
+                # Seek to beginning — BytesIO position may be at end after writing
+                audio_data.file.seek(0)
                 wav_bytes = audio_data.file.read()
                 if len(wav_bytes) < MIN_SPEECH_BYTES:
+                    await self.text_channel.send(f"[debug] audio too short: {len(wav_bytes)} bytes")
                     continue
                 energy = _rms(wav_bytes)
+                await self.text_channel.send(f"[debug] energy={energy:.0f} threshold={SPEECH_THRESHOLD}")
                 if energy > SPEECH_THRESHOLD and energy > best_rms:
                     best_rms = energy
                     best_user = (user_id, wav_bytes)
