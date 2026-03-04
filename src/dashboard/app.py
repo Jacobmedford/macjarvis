@@ -5,7 +5,7 @@ from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 
 from core.database import init_db
-from dashboard.routes import api, emails, index, tasks
+from dashboard.routes import api, chat, emails, index, tasks
 
 BASE_DIR = Path(__file__).parent
 
@@ -28,6 +28,7 @@ def create_app() -> FastAPI:
     application.include_router(index.router)
     application.include_router(tasks.router)
     application.include_router(emails.router)
+    application.include_router(chat.router)
     application.include_router(api.router)
 
     return application

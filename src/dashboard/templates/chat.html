@@ -1,0 +1,296 @@
+{% extends "base.html" %}
+
+{% block title %}Chat — Jarvis{% endblock %}
+
+{% block content %}
+<style>
+  .chat-container {
+    display: flex;
+    flex-direction: column;
+    height: calc(100vh - 120px);
+    max-width: 800px;
+    margin: 0 auto;
+  }
+  .chat-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 1rem 0;
+    border-bottom: 1px solid var(--border, #2a2a2a);
+    margin-bottom: 0;
+  }
+  .chat-header h1 { margin: 0; font-size: 1.4rem; }
+  .chat-header .subtitle { margin: 0; font-size: 0.85rem; opacity: 0.5; }
+  .session-toggle {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    font-size: 0.85rem;
+    color: var(--text-secondary, #888);
+    cursor: pointer;
+    user-select: none;
+  }
+  .toggle-switch {
+    position: relative;
+    width: 40px;
+    height: 22px;
+  }
+  .toggle-switch input { opacity: 0; width: 0; height: 0; }
+  .toggle-slider {
+    position: absolute;
+    inset: 0;
+    background: #333;
+    border-radius: 22px;
+    transition: background 0.2s;
+    cursor: pointer;
+  }
+  .toggle-slider:before {
+    content: "";
+    position: absolute;
+    height: 16px;
+    width: 16px;
+    left: 3px;
+    bottom: 3px;
+    background: white;
+    border-radius: 50%;
+    transition: transform 0.2s;
+  }
+  input:checked + .toggle-slider { background: #4ade80; }
+  input:checked + .toggle-slider:before { transform: translateX(18px); }
+
+  .messages {
+    flex: 1;
+    overflow-y: auto;
+    padding: 1.2rem 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.9rem;
+  }
+  .message {
+    display: flex;
+    flex-direction: column;
+    max-width: 75%;
+  }
+  .message.user { align-self: flex-end; align-items: flex-end; }
+  .message.jarvis { align-self: flex-start; align-items: flex-start; }
+  .bubble {
+    padding: 0.65rem 1rem;
+    border-radius: 14px;
+    font-size: 0.92rem;
+    line-height: 1.5;
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+  .message.user .bubble {
+    background: #2563eb;
+    color: white;
+    border-bottom-right-radius: 4px;
+  }
+  .message.jarvis .bubble {
+    background: var(--card-bg, #1a1a1a);
+    color: var(--text, #e5e5e5);
+    border-bottom-left-radius: 4px;
+    border: 1px solid var(--border, #2a2a2a);
+  }
+  .msg-label {
+    font-size: 0.72rem;
+    opacity: 0.45;
+    margin-bottom: 3px;
+    padding: 0 4px;
+  }
+  .typing .bubble::after {
+    content: "▌";
+    animation: blink 0.7s step-end infinite;
+  }
+  @keyframes blink { 50% { opacity: 0; } }
+
+  .input-row {
+    display: flex;
+    gap: 0.5rem;
+    padding: 1rem 0;
+    border-top: 1px solid var(--border, #2a2a2a);
+  }
+  #msg-input {
+    flex: 1;
+    background: var(--card-bg, #1a1a1a);
+    border: 1px solid var(--border, #2a2a2a);
+    border-radius: 8px;
+    color: var(--text, #e5e5e5);
+    padding: 0.65rem 1rem;
+    font-size: 0.92rem;
+    outline: none;
+    resize: none;
+    font-family: inherit;
+    max-height: 120px;
+  }
+  #msg-input:focus { border-color: #2563eb; }
+  #msg-input:disabled { opacity: 0.4; }
+  #send-btn {
+    background: #2563eb;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    padding: 0.65rem 1.2rem;
+    font-size: 0.92rem;
+    cursor: pointer;
+    align-self: flex-end;
+    transition: background 0.15s;
+  }
+  #send-btn:hover { background: #1d4ed8; }
+  #send-btn:disabled { background: #334; cursor: default; opacity: 0.5; }
+
+  .offline-notice {
+    text-align: center;
+    padding: 2rem;
+    opacity: 0.45;
+    font-size: 0.9rem;
+  }
+</style>
+
+<div class="chat-container">
+  <div class="chat-header">
+    <div>
+      <h1>Jarvis</h1>
+      <p class="subtitle">Personal AI assistant</p>
+    </div>
+    <label class="session-toggle" title="Enable chat session">
+      <span id="toggle-label">Session off</span>
+      <div class="toggle-switch">
+        <input type="checkbox" id="session-toggle">
+        <span class="toggle-slider"></span>
+      </div>
+    </label>
+  </div>
+
+  <div class="messages" id="messages">
+    <p class="offline-notice" id="offline-notice">
+      Flip the switch to start a session with Jarvis.
+    </p>
+  </div>
+
+  <div class="input-row">
+    <textarea
+      id="msg-input"
+      placeholder="Message Jarvis…"
+      rows="1"
+      disabled
+    ></textarea>
+    <button id="send-btn" disabled>Send</button>
+  </div>
+</div>
+
+<script>
+  const toggle = document.getElementById('session-toggle');
+  const toggleLabel = document.getElementById('toggle-label');
+  const input = document.getElementById('msg-input');
+  const sendBtn = document.getElementById('send-btn');
+  const messages = document.getElementById('messages');
+  const offlineNotice = document.getElementById('offline-notice');
+  let active = false;
+  let sending = false;
+
+  toggle.addEventListener('change', () => {
+    active = toggle.checked;
+    toggleLabel.textContent = active ? 'Session on' : 'Session off';
+    input.disabled = !active;
+    sendBtn.disabled = !active;
+    if (active) {
+      if (offlineNotice) offlineNotice.remove();
+      addMessage('jarvis', 'Session started. How can I help you today?');
+      input.focus();
+    } else {
+      addMessage('jarvis', 'Session ended.');
+      input.disabled = true;
+      sendBtn.disabled = true;
+    }
+  });
+
+  // Auto-resize textarea
+  input.addEventListener('input', () => {
+    input.style.height = 'auto';
+    input.style.height = Math.min(input.scrollHeight, 120) + 'px';
+  });
+
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      send();
+    }
+  });
+  sendBtn.addEventListener('click', send);
+
+  function addMessage(role, text) {
+    const wrap = document.createElement('div');
+    wrap.className = `message ${role}`;
+    const label = document.createElement('div');
+    label.className = 'msg-label';
+    label.textContent = role === 'user' ? 'You' : 'Jarvis';
+    const bubble = document.createElement('div');
+    bubble.className = 'bubble';
+    bubble.textContent = text;
+    wrap.appendChild(label);
+    wrap.appendChild(bubble);
+    messages.appendChild(wrap);
+    messages.scrollTop = messages.scrollHeight;
+    return bubble;
+  }
+
+  async function send() {
+    const text = input.value.trim();
+    if (!text || sending || !active) return;
+    sending = true;
+    input.value = '';
+    input.style.height = 'auto';
+    input.disabled = true;
+    sendBtn.disabled = true;
+
+    addMessage('user', text);
+
+    // Typing indicator
+    const typingWrap = document.createElement('div');
+    typingWrap.className = 'message jarvis typing';
+    const typingLabel = document.createElement('div');
+    typingLabel.className = 'msg-label';
+    typingLabel.textContent = 'Jarvis';
+    const typingBubble = document.createElement('div');
+    typingBubble.className = 'bubble';
+    typingWrap.appendChild(typingLabel);
+    typingWrap.appendChild(typingBubble);
+    messages.appendChild(typingWrap);
+    messages.scrollTop = messages.scrollHeight;
+
+    try {
+      const res = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: text }),
+      });
+
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+      // Streaming response
+      typingWrap.classList.remove('typing');
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let reply = '';
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        reply += decoder.decode(value, { stream: true });
+        typingBubble.textContent = reply;
+        messages.scrollTop = messages.scrollHeight;
+      }
+    } catch (err) {
+      typingWrap.classList.remove('typing');
+      typingBubble.textContent = `Error: ${err.message}`;
+    }
+
+    sending = false;
+    if (active) {
+      input.disabled = false;
+      sendBtn.disabled = false;
+      input.focus();
+    }
+  }
+</script>
+{% endblock %}
