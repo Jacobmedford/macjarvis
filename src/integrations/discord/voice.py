@@ -21,8 +21,8 @@ from core.database import AsyncSessionLocal, EmailSummary, Task
 logger = logging.getLogger("discord_voice")
 
 SPEECH_THRESHOLD = 50       # RMS energy threshold
-CHUNK_SECONDS = 3           # Seconds per recording chunk
-MIN_SPEECH_BYTES = 48000 * 2 * 2 // 4  # ~0.3s of audio
+CHUNK_SECONDS = 1.5         # Seconds per recording chunk
+MIN_SPEECH_BYTES = 48000 * 2 * 2 // 8  # ~0.15s of audio
 
 
 def _rms(pcm_bytes: bytes) -> float:
@@ -94,32 +94,38 @@ async def _transcribe(pcm_bytes: bytes) -> str:
 
 
 async def _build_context() -> str:
-    parts: list[str] = []
-    try:
-        from integrations.calendar.client import get_today_events
-        events = await get_today_events()
-        if events:
-            parts.append("Today's meetings: " + ", ".join(e["title"] for e in events))
-    except Exception:
-        pass
+    async def _calendar() -> str:
+        try:
+            from integrations.calendar.client import get_today_events
+            events = await get_today_events()
+            if events:
+                return "Today's meetings: " + ", ".join(e["title"] for e in events)
+        except Exception:
+            pass
+        return ""
 
-    async with AsyncSessionLocal() as session:
-        result = await session.execute(
-            select(EmailSummary).order_by(EmailSummary.created_at.desc()).limit(3)
-        )
-        emails = result.scalars().all()
+    async def _emails() -> str:
+        async with AsyncSessionLocal() as session:
+            result = await session.execute(
+                select(EmailSummary).order_by(EmailSummary.created_at.desc()).limit(3)
+            )
+            emails = result.scalars().all()
         if emails:
-            parts.append("Recent emails: " + "; ".join(f"{e.sender}: {e.subject}" for e in emails))
+            return "Recent emails: " + "; ".join(f"{e.sender}: {e.subject}" for e in emails)
+        return ""
 
-    async with AsyncSessionLocal() as session:
-        result = await session.execute(
-            select(Task).where(Task.status == "pending").limit(5)
-        )
-        pending = result.scalars().all()
+    async def _tasks() -> str:
+        async with AsyncSessionLocal() as session:
+            result = await session.execute(
+                select(Task).where(Task.status == "pending").limit(5)
+            )
+            pending = result.scalars().all()
         if pending:
-            parts.append("Pending tasks: " + "; ".join(t.title for t in pending))
+            return "Pending tasks: " + "; ".join(t.title for t in pending)
+        return ""
 
-    return "\n".join(parts)
+    results = await asyncio.gather(_calendar(), _emails(), _tasks())
+    return "\n".join(r for r in results if r)
 
 
 async def _get_response(transcript: str) -> str:
