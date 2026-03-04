@@ -347,7 +347,8 @@ async def cmd_join(ctx):
 
     channel = ctx.author.voice.channel
     try:
-        vc = await channel.connect()
+        from discord.ext import voice_recv
+        vc = await channel.connect(cls=voice_recv.VoiceRecvClient)
         session = voice_module.VoiceSession(vc, ctx.channel)
         _voice_sessions[guild_id] = session
         await session.start()
