@@ -5,11 +5,11 @@ import logging
 import anthropic
 from fastapi import APIRouter
 from fastapi.requests import Request
-from fastapi.responses import HTMLResponse, StreamingResponse
+from fastapi.responses import HTMLResponse, Response, StreamingResponse
+from fastapi.templating import Jinja2Templates
+from openai import AsyncOpenAI
 from pydantic import BaseModel
 from sqlalchemy import select
-
-from fastapi.templating import Jinja2Templates
 
 from core.config import settings
 from core.database import AsyncSessionLocal, EmailSummary, Task
@@ -28,6 +28,10 @@ async def chat_page(request: Request):
 
 class ChatMessage(BaseModel):
     message: str
+
+
+class TtsRequest(BaseModel):
+    text: str
 
 
 async def _build_context() -> str:
@@ -102,3 +106,17 @@ async def chat_api(body: ChatMessage):
             yield f"Sorry, I hit an error: {exc}"
 
     return StreamingResponse(generate(), media_type="text/plain")
+
+
+@router.post("/api/tts")
+async def tts_api(body: TtsRequest):
+    """Synthesise speech via OpenAI TTS and return MP3 bytes."""
+    if not settings.openai_api_key:
+        return Response(status_code=503)
+    client = AsyncOpenAI(api_key=settings.openai_api_key)
+    resp = await client.audio.speech.create(
+        model="tts-1",
+        voice="onyx",
+        input=body.text[:4096],
+    )
+    return Response(content=resp.content, media_type="audio/mpeg")
