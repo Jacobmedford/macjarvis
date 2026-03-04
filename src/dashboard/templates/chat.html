@@ -3,17 +3,16 @@
 
 {% block content %}
 <style>
-/* ── Layout ─────────────────────────────────────────────── */
 .chat-wrap {
   display: flex;
   flex-direction: column;
-  height: calc(100vh - 57px);   /* full height minus nav */
+  height: calc(100vh - 57px);
   max-width: 780px;
   margin: 0 auto;
   padding: 0 1rem;
 }
 
-/* ── Header bar ─────────────────────────────────────────── */
+/* ── Header ───────────────────────────── */
 .chat-header {
   display: flex;
   align-items: center;
@@ -22,216 +21,110 @@
   border-bottom: 1px solid var(--surface2);
   flex-shrink: 0;
 }
-.chat-identity {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-}
+.chat-identity { display: flex; align-items: center; gap: 0.75rem; }
 .jarvis-avatar {
-  width: 40px;
-  height: 40px;
-  border-radius: 50%;
+  width: 40px; height: 40px; border-radius: 50%;
   background: linear-gradient(135deg, var(--accent), var(--accent2));
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-weight: 700;
-  font-size: 1rem;
-  color: white;
-  flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  font-weight: 700; font-size: 1rem; color: white; flex-shrink: 0;
 }
 .chat-identity h2 { font-size: 1.1rem; font-weight: 600; margin: 0; }
 .chat-identity p  { font-size: 0.78rem; color: var(--muted); margin: 0; }
 
 .status-badge {
-  display: flex;
-  align-items: center;
-  gap: 0.4rem;
-  font-size: 0.78rem;
-  color: var(--muted);
+  display: flex; align-items: center; gap: 0.4rem;
+  font-size: 0.78rem; color: var(--muted);
   padding: 0.3rem 0.75rem;
-  background: var(--surface);
-  border-radius: 999px;
-  border: 1px solid var(--surface2);
-  transition: all 0.25s;
+  background: var(--surface); border-radius: 999px;
+  border: 1px solid var(--surface2); transition: all 0.25s;
 }
 .status-dot {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: var(--muted);
-  transition: background 0.25s;
+  width: 7px; height: 7px; border-radius: 50%;
+  background: var(--success); box-shadow: 0 0 6px var(--success);
+  transition: all 0.25s;
 }
-.status-badge.on .status-dot  { background: var(--success); box-shadow: 0 0 6px var(--success); }
-.status-badge.on               { color: var(--text); border-color: var(--success)33; }
 .status-badge.listening .status-dot { background: var(--accent); box-shadow: 0 0 8px var(--accent); animation: pulse-dot 1s infinite; }
-.status-badge.thinking .status-dot  { background: var(--accent2); box-shadow: 0 0 8px var(--accent2); animation: pulse-dot 1s infinite; }
-.status-badge.speaking .status-dot  { background: var(--warning); box-shadow: 0 0 8px var(--warning); animation: pulse-dot 0.6s infinite; }
-@keyframes pulse-dot { 0%,100% { opacity:1 } 50% { opacity:0.3 } }
+.status-badge.thinking  .status-dot { background: var(--accent2); box-shadow: 0 0 8px var(--accent2); animation: pulse-dot 1s infinite; }
+.status-badge.speaking  .status-dot { background: var(--warning); box-shadow: 0 0 8px var(--warning); animation: pulse-dot 0.6s infinite; }
+@keyframes pulse-dot { 0%,100%{opacity:1} 50%{opacity:0.3} }
+.status-badge.listening { color:var(--text); border-color: var(--accent)44; }
+.status-badge.thinking  { color:var(--text); border-color: var(--accent2)44; }
+.status-badge.speaking  { color:var(--text); border-color: var(--warning)44; }
 
-/* ── Messages ───────────────────────────────────────────── */
+/* ── Messages ─────────────────────────── */
 .messages {
-  flex: 1;
-  overflow-y: auto;
+  flex: 1; overflow-y: auto;
   padding: 1.25rem 0;
-  display: flex;
-  flex-direction: column;
-  gap: 1.1rem;
+  display: flex; flex-direction: column; gap: 1.1rem;
   scroll-behavior: smooth;
 }
 .messages::-webkit-scrollbar { width: 4px; }
-.messages::-webkit-scrollbar-track { background: transparent; }
 .messages::-webkit-scrollbar-thumb { background: var(--surface2); border-radius: 4px; }
 
-/* welcome state */
-.welcome {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  flex: 1;
-  gap: 1rem;
-  opacity: 0.55;
-  text-align: center;
-  padding: 3rem 1rem;
-}
-.welcome-icon {
-  width: 64px;
-  height: 64px;
-  border-radius: 50%;
-  background: linear-gradient(135deg, var(--accent)33, var(--accent2)33);
-  border: 1px solid var(--accent)44;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 1.75rem;
-}
-.welcome h3 { font-size: 1.1rem; font-weight: 600; }
-.welcome p  { font-size: 0.85rem; color: var(--muted); max-width: 280px; }
-
-/* message rows */
-.msg-row {
-  display: flex;
-  gap: 0.65rem;
-  align-items: flex-end;
-}
+.msg-row { display: flex; gap: 0.65rem; align-items: flex-end; }
 .msg-row.user { flex-direction: row-reverse; }
 
 .msg-icon {
-  width: 28px;
-  height: 28px;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 0.7rem;
-  font-weight: 700;
-  flex-shrink: 0;
-  margin-bottom: 2px;
+  width: 28px; height: 28px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 0.7rem; font-weight: 700; flex-shrink: 0; margin-bottom: 2px;
 }
 .msg-row.jarvis .msg-icon { background: linear-gradient(135deg, var(--accent), var(--accent2)); color: white; }
 .msg-row.user   .msg-icon { background: var(--surface2); color: var(--muted); }
 
 .bubble {
-  max-width: 72%;
-  padding: 0.65rem 0.95rem;
-  border-radius: 16px;
-  font-size: 0.9rem;
-  line-height: 1.55;
-  white-space: pre-wrap;
-  word-break: break-word;
+  max-width: 72%; padding: 0.65rem 0.95rem;
+  border-radius: 16px; font-size: 0.9rem; line-height: 1.55;
+  white-space: pre-wrap; word-break: break-word;
 }
 .msg-row.jarvis .bubble {
-  background: var(--surface);
-  border: 1px solid var(--surface2);
-  border-bottom-left-radius: 4px;
-  color: var(--text);
+  background: var(--surface); border: 1px solid var(--surface2);
+  border-bottom-left-radius: 4px; color: var(--text);
 }
 .msg-row.user .bubble {
-  background: var(--accent);
-  color: white;
-  border-bottom-right-radius: 4px;
+  background: var(--accent); color: white; border-bottom-right-radius: 4px;
 }
+.bubble.typing::after { content:"▌"; animation: blink 0.75s step-end infinite; }
+@keyframes blink { 50%{opacity:0} }
 
-/* typing cursor */
-.bubble.typing::after { content: "▌"; opacity: 1; animation: blink 0.75s step-end infinite; }
-@keyframes blink { 50% { opacity: 0 } }
-
-/* play-again button on Jarvis bubbles */
 .replay-btn {
-  background: none;
-  border: none;
-  color: var(--muted);
-  cursor: pointer;
-  font-size: 0.75rem;
-  padding: 2px 4px;
-  opacity: 0;
-  transition: opacity 0.15s;
-  align-self: flex-end;
-  margin-left: 2px;
+  background: none; border: none; color: var(--muted);
+  cursor: pointer; font-size: 0.75rem; padding: 2px 4px;
+  opacity: 0; transition: opacity 0.15s; align-self: flex-end; margin-left: 2px;
 }
 .msg-row.jarvis:hover .replay-btn { opacity: 1; }
 .replay-btn:hover { color: var(--text); }
 
-/* ── Input area ─────────────────────────────────────────── */
-.input-area {
-  flex-shrink: 0;
-  padding: 0.75rem 0 1rem;
-  border-top: 1px solid var(--surface2);
-}
+/* ── Input area ───────────────────────── */
+.input-area { flex-shrink: 0; padding: 0.75rem 0 1rem; border-top: 1px solid var(--surface2); }
+
 .input-row {
-  display: flex;
-  align-items: flex-end;
-  gap: 0.5rem;
-  background: var(--surface);
-  border: 1px solid var(--surface2);
-  border-radius: 14px;
-  padding: 0.5rem 0.5rem 0.5rem 1rem;
+  display: flex; align-items: flex-end; gap: 0.5rem;
+  background: var(--surface); border: 1px solid var(--surface2);
+  border-radius: 14px; padding: 0.5rem 0.5rem 0.5rem 1rem;
   transition: border-color 0.2s;
 }
 .input-row:focus-within { border-color: var(--accent)88; }
 
 #msg-input {
-  flex: 1;
-  background: none;
-  border: none;
-  color: var(--text);
-  font-size: 0.9rem;
-  font-family: inherit;
-  outline: none;
-  resize: none;
-  max-height: 120px;
-  line-height: 1.5;
-  padding: 0.25rem 0;
+  flex: 1; background: none; border: none; color: var(--text);
+  font-size: 0.9rem; font-family: inherit; outline: none;
+  resize: none; max-height: 120px; line-height: 1.5; padding: 0.25rem 0;
 }
 #msg-input::placeholder { color: var(--muted); }
-#msg-input:disabled { opacity: 0.4; }
 
-/* icon buttons */
 .icon-btn {
-  width: 36px;
-  height: 36px;
-  border-radius: 50%;
-  border: none;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  transition: background 0.15s, transform 0.1s;
-  flex-shrink: 0;
+  width: 36px; height: 36px; border-radius: 50%; border: none;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer; transition: background 0.15s, transform 0.1s; flex-shrink: 0;
 }
 .icon-btn:active { transform: scale(0.92); }
 .icon-btn:disabled { opacity: 0.35; cursor: default; }
 
-#mic-btn {
-  background: var(--surface2);
-  color: var(--muted);
-}
-#mic-btn:hover:not(:disabled) { background: var(--accent)33; color: var(--accent); }
+#mic-btn { background: var(--surface2); color: var(--muted); }
+#mic-btn:hover { background: var(--accent)33; color: var(--accent); }
 #mic-btn.listening {
-  background: var(--accent);
-  color: white;
-  box-shadow: 0 0 0 0 var(--accent);
+  background: var(--accent); color: white;
   animation: mic-pulse 1.2s infinite;
 }
 @keyframes mic-pulse {
@@ -239,83 +132,47 @@
   70%  { box-shadow: 0 0 0 10px var(--accent)00; }
   100% { box-shadow: 0 0 0 0   var(--accent)00; }
 }
+#send-btn { background: var(--accent); color: white; }
+#send-btn:hover { background: #6b5ce7; }
 
-#send-btn {
-  background: var(--accent);
-  color: white;
+.bottom-bar {
+  display: flex; justify-content: space-between; align-items: center;
+  margin-top: 0.5rem; padding: 0 0.25rem;
+  font-size: 0.75rem; color: var(--muted);
 }
-#send-btn:hover:not(:disabled) { background: #6b5ce7; }
-#send-btn:disabled { background: var(--surface2); color: var(--muted); }
-
-/* voice toggle */
-.voice-toggle {
-  display: flex;
-  align-items: center;
-  gap: 0.4rem;
-  font-size: 0.75rem;
-  color: var(--muted);
-  margin-top: 0.5rem;
-  padding-left: 0.25rem;
-  cursor: pointer;
-  user-select: none;
-}
+.voice-toggle { display: flex; align-items: center; gap: 0.4rem; cursor: pointer; user-select: none; }
 .voice-toggle input { display: none; }
-.voice-toggle .pill {
-  width: 32px;
-  height: 18px;
-  background: var(--surface2);
-  border-radius: 18px;
-  position: relative;
-  transition: background 0.2s;
+.pill {
+  width: 32px; height: 18px; background: var(--surface2); border-radius: 18px;
+  position: relative; transition: background 0.2s;
 }
-.voice-toggle .pill::after {
-  content: "";
-  position: absolute;
-  width: 12px;
-  height: 12px;
-  background: white;
-  border-radius: 50%;
-  top: 3px;
-  left: 3px;
-  transition: transform 0.2s;
+.pill::after {
+  content:""; position: absolute; width: 12px; height: 12px; background: white;
+  border-radius: 50%; top: 3px; left: 3px; transition: transform 0.2s;
 }
 .voice-toggle input:checked ~ .pill { background: var(--accent2); }
 .voice-toggle input:checked ~ .pill::after { transform: translateX(14px); }
-.voice-toggle .voice-label { transition: color 0.2s; }
-.voice-toggle input:checked ~ .voice-label { color: var(--accent2); }
+.hint { color: var(--muted); font-size: 0.72rem; }
 </style>
 
 <div class="chat-wrap">
-
-  <!-- Header -->
   <div class="chat-header">
     <div class="chat-identity">
       <div class="jarvis-avatar">J</div>
-      <div>
-        <h2>Jarvis</h2>
-        <p>Personal AI assistant</p>
-      </div>
+      <div><h2>Jarvis</h2><p>Personal AI assistant</p></div>
     </div>
     <div class="status-badge" id="status-badge">
       <span class="status-dot"></span>
-      <span id="status-text">Offline</span>
+      <span id="status-text">Ready</span>
     </div>
   </div>
 
-  <!-- Messages -->
-  <div class="messages" id="messages">
-    <div class="welcome" id="welcome">
-      <div class="welcome-icon">🤖</div>
-      <h3>Start a session</h3>
-      <p>Click the mic or type a message — Jarvis is ready when you are.</p>
-    </div>
-  </div>
+  <div class="messages" id="messages"></div>
 
-  <!-- Input -->
   <div class="input-area">
     <div class="input-row">
-      <textarea id="msg-input" placeholder="Message Jarvis…" rows="1" disabled></textarea>
-      <button class="icon-btn" id="mic-btn" title="Hold to speak" disabled>
+      <textarea id="msg-input" placeholder="Type a message or click the mic…" rows="1"></textarea>
+      <button class="icon-btn" id="mic-btn" title="Click to speak">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
           <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
@@ -323,233 +180,129 @@
           <line x1="8" y1="23" x2="16" y2="23"/>
         </svg>
       </button>
-      <button class="icon-btn" id="send-btn" title="Send" disabled>
+      <button class="icon-btn" id="send-btn" title="Send">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
           <line x1="22" y1="2" x2="11" y2="13"/>
           <polygon points="22 2 15 22 11 13 2 9 22 2"/>
         </svg>
       </button>
     </div>
-    <label class="voice-toggle" title="Jarvis speaks responses aloud">
-      <input type="checkbox" id="voice-out-toggle" checked>
-      <span class="pill"></span>
-      <span class="voice-label" id="voice-label">Voice responses on</span>
-    </label>
+    <div class="bottom-bar">
+      <label class="voice-toggle" title="Jarvis speaks replies aloud">
+        <input type="checkbox" id="voice-out" checked>
+        <span class="pill"></span>
+        <span id="voice-label">Voice on</span>
+      </label>
+      <span class="hint" id="hint-text">Click mic to speak · Enter to send</span>
+    </div>
   </div>
 </div>
 
 <script>
-const statusBadge = document.getElementById('status-badge');
-const statusText  = document.getElementById('status-text');
-const messages    = document.getElementById('messages');
-const welcome     = document.getElementById('welcome');
-const input       = document.getElementById('msg-input');
-const micBtn      = document.getElementById('mic-btn');
-const sendBtn     = document.getElementById('send-btn');
-const voiceToggle = document.getElementById('voice-out-toggle');
-const voiceLabel  = document.getElementById('voice-label');
+const badge      = document.getElementById('status-badge');
+const statusTxt  = document.getElementById('status-text');
+const msgs       = document.getElementById('messages');
+const inp        = document.getElementById('msg-input');
+const micBtn     = document.getElementById('mic-btn');
+const sendBtn    = document.getElementById('send-btn');
+const voiceOut   = document.getElementById('voice-out');
+const voiceLabel = document.getElementById('voice-label');
+const hintText   = document.getElementById('hint-text');
 
-let sending = false;
-let recognition = null;
-let micActive = false;
-let currentAudio = null;
-let sessionStarted = false;
+let sending    = false;
+let micActive  = false;
+let curAudio   = null;
 
-// ── Voice output toggle label ──────────────────────────────
-voiceToggle.addEventListener('change', () => {
-  voiceLabel.textContent = voiceToggle.checked ? 'Voice responses on' : 'Voice responses off';
-  if (!voiceToggle.checked && currentAudio) { currentAudio.pause(); currentAudio = null; }
-});
-
-// ── Status helper ─────────────────────────────────────────
+// ── Status ──────────────────────────────────────────────────
 function setStatus(state, label) {
-  statusBadge.className = 'status-badge ' + state;
-  statusText.textContent = label;
+  badge.className = 'status-badge ' + state;
+  statusTxt.textContent = label;
 }
 
-// ── Enable inputs (first interaction starts session) ──────
-function ensureSession() {
-  if (sessionStarted) return;
-  sessionStarted = true;
-  if (welcome) welcome.remove();
-  input.disabled = false;
-  micBtn.disabled = false;
-  sendBtn.disabled = false;
-  setStatus('on', 'Online');
-}
-
-// ── Speech Recognition (STT) ──────────────────────────────
-const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
-if (SpeechRec) {
-  recognition = new SpeechRec();
-  recognition.lang = 'en-US';
-  recognition.interimResults = true;
-  recognition.continuous = false;
-
-  let interimValue = '';
-
-  recognition.onstart = () => {
-    micActive = true;
-    micBtn.classList.add('listening');
-    setStatus('listening', 'Listening…');
-    ensureSession();
-  };
-
-  recognition.onresult = (e) => {
-    let interim = '', final = '';
-    for (let i = e.resultIndex; i < e.results.length; i++) {
-      const t = e.results[i][0].transcript;
-      if (e.results[i].isFinal) final += t;
-      else interim += t;
-    }
-    input.value = (final || interim).trim();
-    autoResize();
-    interimValue = interim;
-  };
-
-  recognition.onend = () => {
-    micActive = false;
-    micBtn.classList.remove('listening');
-    if (sessionStarted) setStatus('on', 'Online');
-    const text = input.value.trim();
-    if (text) send();
-  };
-
-  recognition.onerror = (e) => {
-    micActive = false;
-    micBtn.classList.remove('listening');
-    if (sessionStarted) setStatus('on', 'Online');
-    if (e.error !== 'no-speech') console.warn('STT error:', e.error);
-  };
-
-  micBtn.addEventListener('click', () => {
-    if (sending) return;
-    if (micActive) {
-      recognition.stop();
-    } else {
-      if (currentAudio) { currentAudio.pause(); currentAudio = null; }
-      input.value = '';
-      recognition.start();
-    }
-  });
-} else {
-  // No browser STT — hide mic, show note
-  micBtn.style.display = 'none';
-}
-
-// ── Click mic or type to auto-start session ───────────────
-input.addEventListener('focus', ensureSession);
-
-// ── Textarea auto-resize ──────────────────────────────────
-function autoResize() {
-  input.style.height = 'auto';
-  input.style.height = Math.min(input.scrollHeight, 120) + 'px';
-}
-input.addEventListener('input', autoResize);
-
-// Enter = send (Shift+Enter = newline)
-input.addEventListener('keydown', (e) => {
-  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); }
+// ── Voice output toggle ─────────────────────────────────────
+voiceOut.addEventListener('change', () => {
+  voiceLabel.textContent = voiceOut.checked ? 'Voice on' : 'Voice off';
+  if (!voiceOut.checked && curAudio) { curAudio.pause(); curAudio = null; setStatus('', 'Ready'); }
 });
-sendBtn.addEventListener('click', send);
 
-// ── Add message bubble ────────────────────────────────────
-function addMessage(role, text = '') {
-  const row = document.createElement('div');
-  row.className = `msg-row ${role}`;
-
-  const icon = document.createElement('div');
+// ── Add message ─────────────────────────────────────────────
+function addMsg(role, text) {
+  const row    = document.createElement('div');
+  row.className = 'msg-row ' + role;
+  const icon   = document.createElement('div');
   icon.className = 'msg-icon';
   icon.textContent = role === 'jarvis' ? 'J' : 'Y';
-
   const bubble = document.createElement('div');
   bubble.className = 'bubble';
   bubble.textContent = text;
-
   row.appendChild(icon);
   row.appendChild(bubble);
-
   if (role === 'jarvis') {
-    const replayBtn = document.createElement('button');
-    replayBtn.className = 'replay-btn';
-    replayBtn.title = 'Play again';
-    replayBtn.innerHTML = '🔊';
-    replayBtn.addEventListener('click', () => {
-      if (bubble.textContent) playTTS(bubble.textContent, replayBtn);
-    });
-    row.appendChild(replayBtn);
+    const rb = document.createElement('button');
+    rb.className = 'replay-btn'; rb.title = 'Play again'; rb.textContent = '🔊';
+    rb.onclick = () => playTTS(bubble.textContent, rb);
+    row.appendChild(rb);
   }
-
-  messages.appendChild(row);
-  messages.scrollTop = messages.scrollHeight;
+  msgs.appendChild(row);
+  msgs.scrollTop = msgs.scrollHeight;
   return bubble;
 }
 
-// ── TTS playback ──────────────────────────────────────────
-async function playTTS(text, triggerEl) {
-  if (currentAudio) { currentAudio.pause(); currentAudio = null; }
+// ── TTS ─────────────────────────────────────────────────────
+async function playTTS(text, btn) {
+  if (curAudio) { curAudio.pause(); curAudio = null; }
   setStatus('speaking', 'Speaking…');
-  if (triggerEl) triggerEl.textContent = '⏸';
-
+  if (btn) btn.textContent = '⏸';
   try {
-    const res = await fetch('/api/tts', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+    const res  = await fetch('/api/tts', {
+      method: 'POST', headers: {'Content-Type':'application/json'},
       body: JSON.stringify({ text }),
     });
-    if (!res.ok) throw new Error('TTS failed');
+    if (!res.ok) throw new Error();
     const blob = await res.blob();
     const audio = new Audio(URL.createObjectURL(blob));
-    currentAudio = audio;
+    curAudio = audio;
     audio.onended = () => {
-      currentAudio = null;
-      if (triggerEl) triggerEl.textContent = '🔊';
-      setStatus('on', 'Online');
+      curAudio = null;
+      if (btn) btn.textContent = '🔊';
+      setStatus('', 'Ready');
     };
-    await audio.play();
-  } catch (err) {
-    console.warn('TTS error:', err);
-    setStatus('on', 'Online');
-    if (triggerEl) triggerEl.textContent = '🔊';
+    audio.play();
+  } catch {
+    if (btn) btn.textContent = '🔊';
+    setStatus('', 'Ready');
   }
 }
 
-// ── Send message ──────────────────────────────────────────
+// ── Send ────────────────────────────────────────────────────
 async function send() {
-  const text = input.value.trim();
+  const text = inp.value.trim();
   if (!text || sending) return;
-  ensureSession();
-
   sending = true;
-  input.value = '';
-  input.style.height = 'auto';
-  input.disabled = true;
-  micBtn.disabled = true;
-  sendBtn.disabled = true;
+  inp.value = ''; inp.style.height = 'auto';
+  inp.disabled = true; sendBtn.disabled = true;
 
-  addMessage('user', text);
+  addMsg('user', text);
   setStatus('thinking', 'Thinking…');
 
-  const bubble = addMessage('jarvis');
+  const bubble = addMsg('jarvis');
   bubble.classList.add('typing');
 
   let reply = '';
   try {
     const res = await fetch('/api/chat', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      method: 'POST', headers: {'Content-Type':'application/json'},
       body: JSON.stringify({ message: text }),
     });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
-
     const reader = res.body.getReader();
-    const dec = new TextDecoder();
+    const dec    = new TextDecoder();
     while (true) {
       const { done, value } = await reader.read();
       if (done) break;
       reply += dec.decode(value, { stream: true });
       bubble.textContent = reply;
-      messages.scrollTop = messages.scrollHeight;
+      msgs.scrollTop = msgs.scrollHeight;
     }
   } catch (err) {
     reply = `Error: ${err.message}`;
@@ -558,18 +311,93 @@ async function send() {
 
   bubble.classList.remove('typing');
   sending = false;
-  input.disabled = false;
-  micBtn.disabled = false;
+  inp.disabled = false;
   sendBtn.disabled = false;
-  input.focus();
 
-  // Speak the reply if voice is on
-  if (voiceToggle.checked && reply && !reply.startsWith('Error:')) {
-    const replayBtn = bubble.parentElement.querySelector('.replay-btn');
-    await playTTS(reply, replayBtn);
+  if (voiceOut.checked && reply && !reply.startsWith('Error:')) {
+    const rb = bubble.parentElement.querySelector('.replay-btn');
+    await playTTS(reply, rb);
   } else {
-    setStatus('on', 'Online');
+    setStatus('', 'Ready');
   }
+  inp.focus();
 }
+
+// ── Textarea ────────────────────────────────────────────────
+inp.addEventListener('input', () => {
+  inp.style.height = 'auto';
+  inp.style.height = Math.min(inp.scrollHeight, 120) + 'px';
+});
+inp.addEventListener('keydown', e => {
+  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); }
+});
+sendBtn.addEventListener('click', send);
+
+// ── Mic (Web Speech API) ────────────────────────────────────
+const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
+if (!SpeechRec) {
+  micBtn.style.display = 'none';
+  hintText.textContent = 'Enter to send  ·  mic not supported in this browser';
+} else {
+  const rec = new SpeechRec();
+  rec.lang = 'en-US';
+  rec.interimResults = true;
+  rec.continuous = false;
+
+  rec.onstart = () => {
+    micActive = true;
+    micBtn.classList.add('listening');
+    setStatus('listening', 'Listening…');
+    hintText.textContent = 'Speak now… click mic again to cancel';
+  };
+
+  rec.onresult = e => {
+    let out = '';
+    for (let i = e.resultIndex; i < e.results.length; i++)
+      out += e.results[i][0].transcript;
+    inp.value = out.trim();
+    inp.style.height = 'auto';
+    inp.style.height = Math.min(inp.scrollHeight, 120) + 'px';
+  };
+
+  rec.onend = () => {
+    micActive = false;
+    micBtn.classList.remove('listening');
+    hintText.textContent = 'Click mic to speak · Enter to send';
+    const text = inp.value.trim();
+    if (text) {
+      send();
+    } else {
+      setStatus('', 'Ready');
+    }
+  };
+
+  rec.onerror = e => {
+    micActive = false;
+    micBtn.classList.remove('listening');
+    setStatus('', 'Ready');
+    hintText.textContent = 'Click mic to speak · Enter to send';
+    if (e.error === 'not-allowed') {
+      hintText.textContent = '⚠ Microphone access denied — check browser permissions';
+    }
+  };
+
+  micBtn.addEventListener('click', () => {
+    if (sending) return;
+    if (micActive) {
+      rec.stop();
+    } else {
+      if (curAudio) { curAudio.pause(); curAudio = null; }
+      inp.value = '';
+      rec.start();
+    }
+  });
+}
+
+// ── Greeting on load ────────────────────────────────────────
+window.addEventListener('load', () => {
+  addMsg('jarvis', "Hello! I'm Jarvis. You can type a message or click the microphone and speak — I'm listening.");
+  inp.focus();
+});
 </script>
 {% endblock %}
