@@ -20,6 +20,21 @@ from core.database import AsyncSessionLocal, EmailSummary, Task
 
 logger = logging.getLogger("discord_voice")
 
+# Load libopus explicitly — discord.py searches by name only but Homebrew
+# installs it at a non-standard path on Apple Silicon.
+if not discord.opus.is_loaded():
+    for _opus_path in (
+        "/opt/homebrew/lib/libopus.dylib",
+        "/usr/local/lib/libopus.dylib",
+        "libopus",
+    ):
+        try:
+            discord.opus.load_opus(_opus_path)
+            logger.info("Loaded libopus from %s", _opus_path)
+            break
+        except OSError:
+            pass
+
 SPEECH_THRESHOLD = 50       # RMS energy threshold
 CHUNK_SECONDS = 1.5         # Seconds per recording chunk
 MIN_SPEECH_BYTES = 48000 * 2 * 2 // 8  # ~0.15s of audio
