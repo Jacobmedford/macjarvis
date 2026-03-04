@@ -6,6 +6,8 @@ Commands:
   !tasks          — list all tasks
   !voice on/off   — manually enable/disable Jarvis voice output
   !status         — show voice state and next meeting
+  !join           — Jarvis joins your voice channel and starts listening
+  !leave          — Jarvis leaves the voice channel
 
 Natural language:
   DM the bot or mention @Jarvis with any message — Jarvis replies via
@@ -40,7 +42,18 @@ STATE_PATH = Path("data/discord_state.json")
 intents = discord.Intents.default()
 intents.message_content = True
 intents.dm_messages = True
+intents.voice_states = True
 bot = commands.Bot(command_prefix="!", intents=intents)
+
+# Active voice sessions: guild_id → VoiceSession
+_voice_sessions: dict[int, "voice_module.VoiceSession"] = {}
+
+try:
+    import integrations.discord.voice as voice_module
+    _voice_available = True
+except ImportError as e:
+    logger.warning("Voice module unavailable: %s", e)
+    _voice_available = False
 
 
 # ─── State helpers ──────────────────────────────────────────────────────────
@@ -314,6 +327,45 @@ async def cmd_status(ctx):
 
 
 # ─── Background task ─────────────────────────────────────────────────────────
+
+
+@bot.command(name="join")
+async def cmd_join(ctx):
+    """Jarvis joins your voice channel and starts listening: !join"""
+    if not _voice_available:
+        await ctx.send("Voice support is not available. Make sure PyNaCl and ffmpeg are installed.")
+        return
+
+    if not ctx.author.voice or not ctx.author.voice.channel:
+        await ctx.send("You need to be in a voice channel first.")
+        return
+
+    guild_id = ctx.guild.id
+    if guild_id in _voice_sessions:
+        await ctx.send("Jarvis is already in a voice channel. Use `!leave` first.")
+        return
+
+    channel = ctx.author.voice.channel
+    try:
+        vc = await channel.connect()
+        session = voice_module.VoiceSession(vc, ctx.channel)
+        _voice_sessions[guild_id] = session
+        await session.start()
+    except Exception as exc:
+        await ctx.send(f"Failed to join voice channel: {exc}")
+        logger.error("Voice join error: %s", exc)
+
+
+@bot.command(name="leave")
+async def cmd_leave(ctx):
+    """Jarvis leaves the voice channel: !leave"""
+    guild_id = ctx.guild.id
+    session = _voice_sessions.pop(guild_id, None)
+    if session:
+        await session.stop()
+        await ctx.send("Jarvis has left the voice channel.")
+    else:
+        await ctx.send("Jarvis is not in a voice channel.")
 
 
 @tasks.loop(seconds=30)

@@ -31,7 +31,8 @@ dependencies = [
     "slack-bolt>=1.21",
     "slack-sdk>=3.34",
     # Phase 4 – Discord
-    "discord.py>=2.4",
+    "discord.py[voice]>=2.4",
+    "PyNaCl>=1.5",
 ]
 
 [dependency-groups]
